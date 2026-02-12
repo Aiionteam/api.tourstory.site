@@ -27,14 +27,16 @@ public class UserServiceImpl implements UserService {
     private EntityManager entityManager;
 
     private static String honorToTier(int honor) {
-        if (honor >= 1000) return "DIAMOND";
-        if (honor >= 500) return "PLATINUM";
-        if (honor >= 100) return "GOLD";
+        int h = Math.max(0, Math.min(site.aiion.api.services.groupchat.ChatRoomType.MAX_HONOR, honor));
+        if (h >= 1000) return "DIAMOND";
+        if (h >= 500) return "PLATINUM";
+        if (h >= 100) return "GOLD";
         return "SILVER";
     }
 
     private UserModel entityToModel(User entity) {
         int h = entity.getHonor() != null ? entity.getHonor() : 0;
+        h = Math.max(0, Math.min(site.aiion.api.services.groupchat.ChatRoomType.MAX_HONOR, h));
         return UserModel.builder()
                 .id(entity.getId())
                 .name(entity.getName())
@@ -249,7 +251,8 @@ public class UserServiceImpl implements UserService {
         if (optionalEntity.isPresent()) {
             User existing = optionalEntity.get();
             
-            Integer honor = userModel.getHonor() != null ? userModel.getHonor() : (existing.getHonor() != null ? existing.getHonor() : 0);
+            int rawHonor = userModel.getHonor() != null ? userModel.getHonor() : (existing.getHonor() != null ? existing.getHonor() : 0);
+            Integer honor = Math.max(0, Math.min(site.aiion.api.services.groupchat.ChatRoomType.MAX_HONOR, rawHonor));
             User updated = User.builder()
                     .id(existing.getId())
                     .name(userModel.getName() != null ? userModel.getName() : existing.getName())
@@ -360,7 +363,8 @@ public class UserServiceImpl implements UserService {
         }
         User target = targetOpt.get();
         int delta = "UP".equals(act) ? 1 : -1;
-        int newHonor = Math.max(0, (target.getHonor() != null ? target.getHonor() : 0) + delta);
+        int current = target.getHonor() != null ? target.getHonor() : 0;
+        int newHonor = Math.max(0, Math.min(site.aiion.api.services.groupchat.ChatRoomType.MAX_HONOR, current + delta));
         honorVoteRepository.save(HonorVote.builder()
                 .voterId(voterId)
                 .targetId(targetUserId)

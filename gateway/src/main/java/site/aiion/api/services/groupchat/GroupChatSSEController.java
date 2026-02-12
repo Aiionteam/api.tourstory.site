@@ -21,6 +21,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import site.aiion.api.services.oauth.util.JwtTokenProvider;
+import site.aiion.api.services.user.UserRepository;
+import site.aiion.api.services.user.User;
+
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -30,6 +34,8 @@ import java.util.stream.Collectors;
 public class GroupChatSSEController {
 
     private final GroupChatRepository groupChatRepository;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(10);
     private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicLong> lastMessageIds = new ConcurrentHashMap<>();
@@ -37,18 +43,54 @@ public class GroupChatSSEController {
     private final ConcurrentHashMap<String, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "실시간 메시지 스트림 (SSE, 방별)", description = "지정 등급 방의 새 메시지를 실시간으로 받습니다. roomType: SILVER, GOLD, PLATINUM, DIAMOND")
+    @Operation(summary = "실시간 메시지 스트림 (SSE, 방별)", description = "JWT 필요(token 쿼리 파라미터). 지정 등급 방의 새 메시지를 실시간으로 받습니다. 명예도 부족 시 403.")
     public SseEmitter streamMessages(
             @RequestParam(value = "roomType", defaultValue = "SILVER") String roomType,
             @RequestParam(value = "lastId", defaultValue = "0") Long lastId,
+            @RequestParam(value = "token", required = false) String tokenParam,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletResponse response) {
-        String rt = (roomType != null && !roomType.isBlank()) ? roomType.toUpperCase() : "SILVER";
-        try {
-            ChatRoomType.valueOf(rt);
-        } catch (Exception e) {
-            rt = "SILVER";
+        String token = tokenParam;
+        if (token == null || token.isBlank()) {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
         }
-        final String roomTypeNorm = rt;
+        if (token == null || token.isBlank() || !jwtTokenProvider.validateToken(token)) {
+            try {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"code\":401,\"message\":\"인증이 필요합니다.\"}");
+            } catch (Exception ignored) {}
+            return null;
+        }
+        Long userId;
+        try {
+            userId = Long.parseLong(jwtTokenProvider.getUserIdFromToken(token));
+        } catch (NumberFormatException e) {
+            try {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"code\":401,\"message\":\"유효하지 않은 토큰입니다.\"}");
+            } catch (Exception ignored) {}
+            return null;
+        }
+        int userHonor = userRepository.findById(userId)
+                .map(u -> u.getHonor() != null ? u.getHonor() : 0)
+                .orElse(0);
+        String rt = (roomType != null && !roomType.isBlank()) ? roomType.toUpperCase() : "SILVER";
+        ChatRoomType room;
+        try {
+            room = ChatRoomType.valueOf(rt);
+        } catch (Exception e) {
+            room = ChatRoomType.SILVER;
+        }
+        if (!room.canAccess(userHonor)) {
+            try {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().write("{\"code\":403,\"message\":\"명예도가 부족하여 해당 방에 입장할 수 없습니다.\"}");
+            } catch (Exception ignored) {}
+            return null;
+        }
+        final String roomTypeNorm = room.name();
 
         String allowOrigin = System.getenv("FRONTEND_URL");
         if (allowOrigin == null || allowOrigin.isEmpty()) {
