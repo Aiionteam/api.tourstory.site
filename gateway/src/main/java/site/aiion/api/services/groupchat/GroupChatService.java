@@ -20,6 +20,11 @@ public interface GroupChatService {
     Messenger findRecentMessages(String roomType, int limit);
     
     /**
+     * 24시간이 지난 메시지 삭제 (스케줄러에서 호출)
+     */
+    int deleteMessagesOlderThanRetention();
+
+    /**
      * 모든 메시지 삭제 (관리자만 가능)
      */
     Messenger deleteAll();

@@ -353,23 +353,39 @@ public class UserServiceImpl implements UserService {
         if (act == null) {
             return Messenger.builder().code(400).message("action은 UP 또는 DOWN이어야 합니다.").build();
         }
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-        if (honorVoteRepository.findByVoterIdAndTargetIdAndActionAndVoteDate(voterId, targetUserId, act, today).isPresent()) {
-            return Messenger.builder().code(400).message("오늘 이미 해당 사용자에게 " + (act.equals("UP") ? "명예도 올리기" : "명예도 내리기") + "를 했습니다.").build();
+        // 태평양 자정 기준 날짜 (24시에 기회 리셋)
+        LocalDate todayPacific = LocalDate.now(HonorVote.VOTE_DATE_ZONE);
+        if (honorVoteRepository.findByVoterIdAndTargetIdAndActionAndVoteDate(voterId, targetUserId, act, todayPacific).isPresent()) {
+            return Messenger.builder().code(400).message("오늘(태평양 기준) 이미 해당 사용자에게 " + (act.equals("UP") ? "명예도 올리기" : "명예도 내리기") + "를 했습니다.").build();
+        }
+        final int dailyLimit = 3;
+        long countSameAction = honorVoteRepository.countByVoterIdAndActionAndVoteDate(voterId, act, todayPacific);
+        if (countSameAction >= dailyLimit) {
+            return Messenger.builder()
+                    .code(400)
+                    .message("오늘(태평양 기준) 명예도 " + (act.equals("UP") ? "올리기" : "내리기") + "는 " + dailyLimit + "번까지 가능합니다. 내일 다시 시도해 주세요.")
+                    .build();
         }
         Optional<User> targetOpt = userRepository.findById(targetUserId);
         if (targetOpt.isEmpty()) {
             return Messenger.builder().code(404).message("대상 사용자를 찾을 수 없습니다.").build();
         }
         User target = targetOpt.get();
-        int delta = "UP".equals(act) ? 1 : -1;
         int current = target.getHonor() != null ? target.getHonor() : 0;
+        // 명예도 상한 1000: 이미 1000 이상이면 올리기 불가
+        if ("UP".equals(act) && current >= 1000) {
+            return Messenger.builder()
+                    .code(400)
+                    .message("대상 사용자의 명예도가 이미 상한(1000)에 도달하여 더 올릴 수 없습니다.")
+                    .build();
+        }
+        int delta = "UP".equals(act) ? 1 : -1;
         int newHonor = Math.max(0, Math.min(site.aiion.api.services.groupchat.ChatRoomType.MAX_HONOR, current + delta));
         honorVoteRepository.save(HonorVote.builder()
                 .voterId(voterId)
                 .targetId(targetUserId)
                 .action(act)
-                .voteDate(today)
+                .voteDate(todayPacific)
                 .build());
         User updated = User.builder()
                 .id(target.getId())

@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -204,6 +206,9 @@ public class GroupChatSSEController {
         }
     }
 
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+    private static final int RETENTION_HOURS = 24;
+
     private List<GroupChatModel> getMessagesAfterId(String roomType, Long lastId) {
         try {
             if (lastId == null || lastId < 0) lastId = 0L;
@@ -211,7 +216,8 @@ public class GroupChatSSEController {
             try {
                 rt = ChatRoomType.valueOf(roomType != null ? roomType.toUpperCase() : "SILVER");
             } catch (Exception ignored) {}
-            List<GroupChat> entities = groupChatRepository.findByIdGreaterThanAndRoomTypeOrderByCreatedAtAsc(lastId, rt);
+            LocalDateTime cutoff = LocalDateTime.now(ZONE).minusHours(RETENTION_HOURS);
+            List<GroupChat> entities = groupChatRepository.findByIdGreaterThanAndRoomTypeAndCreatedAtAfterOrderByCreatedAtAsc(lastId, rt, cutoff);
             return entities.stream().map(this::entityToModel).collect(Collectors.toList());
         } catch (Exception e) {
             log.error("메시지 조회 오류", e);

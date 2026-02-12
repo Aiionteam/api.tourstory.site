@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import site.aiion.api.services.user.common.domain.Messenger;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,8 +19,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GroupChatServiceImpl implements GroupChatService {
 
+    /** 메시지 보관 시간(시간). 이 시간이 지나면 조회에서 제외되고 스케줄러가 삭제함 */
+    private static final int RETENTION_HOURS = 24;
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
     private final GroupChatRepository groupChatRepository;
     private final ApplicationContext applicationContext;
+
+    private static LocalDateTime cutoffNow() {
+        return LocalDateTime.now(ZONE).minusHours(RETENTION_HOURS);
+    }
     
     // SSE 컨트롤러 가져오기 (순환 참조 방지)
     private GroupChatSSEController getSseController() {
@@ -151,7 +161,8 @@ public class GroupChatServiceImpl implements GroupChatService {
                     rt = ChatRoomType.valueOf(roomType.toUpperCase());
                 } catch (Exception ignored) {}
             }
-            List<GroupChat> entities = groupChatRepository.findTop50ByRoomTypeOrderByCreatedAtDesc(rt);
+            LocalDateTime cutoff = cutoffNow();
+            List<GroupChat> entities = groupChatRepository.findTop50ByRoomTypeAndCreatedAtAfterOrderByCreatedAtDesc(rt, cutoff);
             List<GroupChatModel> messages = entities.stream()
                     .limit(limit)
                     .map(this::entityToModel)
@@ -169,6 +180,18 @@ public class GroupChatServiceImpl implements GroupChatService {
                     .message("최근 메시지 조회 중 오류가 발생했습니다: " + e.getMessage())
                     .build();
         }
+    }
+
+    @Override
+    @Transactional
+    public int deleteMessagesOlderThanRetention() {
+        LocalDateTime cutoff = cutoffNow();
+        long count = groupChatRepository.countByCreatedAtBefore(cutoff);
+        if (count > 0) {
+            groupChatRepository.deleteByCreatedAtBefore(cutoff);
+            log.info("단체채팅 24시간 경과 메시지 삭제: {} 건", count);
+        }
+        return (int) count;
     }
 
     @Override
