@@ -16,6 +16,9 @@ spring:
     web-application-type: servlet  # servlet 모드로 변경 (서비스 컨트롤러와 호환)
   datasource:
     driver-class-name: org.postgresql.Driver
+    url: ${SPRING_DATASOURCE_URL:${NEON_CONNECTION_STRING:}}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
       maximum-pool-size: 5
       minimum-idle: 2
