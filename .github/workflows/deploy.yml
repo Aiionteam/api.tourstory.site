@@ -84,6 +84,10 @@ jobs:
           set -e
           cd ~/app
           if [ -f .env ]; then set -a; . ./.env || true; set +a; fi
+          # Spring Boot가 읽을 수 있도록 DB 관련 변수 명시 export
+          [ -n "$NEON_CONNECTION_STRING" ] && export SPRING_DATASOURCE_URL="$NEON_CONNECTION_STRING"
+          [ -n "$NEON_USER" ] && export SPRING_DATASOURCE_USERNAME="$NEON_USER"
+          [ -n "$NEON_PASSWORD" ] && export SPRING_DATASOURCE_PASSWORD="$NEON_PASSWORD"
           pkill -f gateway.jar || true
           sleep 2
           touch app.log
