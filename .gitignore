@@ -36,3 +36,23 @@ out/
 ### VS Code ###
 .vscode/
 
+### Environment & Secrets ###
+.env
+.env.local
+.env.*.local
+
+### Keys & Certificates ###
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.crt
+
+### Logs ###
+*.log
+logs/
+
+### OS ###
+.DS_Store
+Thumbs.db

@@ -1,0 +1,78 @@
+# feature/yujin 브랜치에 push 시 빌드 후 EC2 배포
+#
+# 필수 GitHub Secrets (Settings → Secrets and variables → Actions):
+#   EC2_HOST      - EC2 퍼블릭 IP 또는 도메인
+#   EC2_USER      - SSH 사용자 (Ubuntu: ubuntu)
+#   EC2_SSH_KEY   - PEM 키 파일 내용 전체
+#
+# 선택: .env를 EC2로 복사하려면
+#   Variables에 USE_ENV_FILE = true 추가
+#   Secrets에 ENV_FILE = .env 파일 내용 전체 추가
+#
+name: Build and Deploy to EC2
+
+on:
+  push:
+    branches:
+      - feature/yujin
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build JAR
+        run: ./gradlew :gateway:bootJar --no-daemon
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-jar
+          path: gateway/build/libs/*.jar
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gateway-jar
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Ensure app directory on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'mkdir -p ~/app'
+
+      - name: Copy JAR to EC2
+        run: |
+          scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no *.jar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/gateway.jar
+
+      - name: Copy .env to EC2
+        if: vars.USE_ENV_FILE == 'true'
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+          scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/.env
+
+      - name: Restart application on EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            'cd ~/app && ([ -f .env ] && export $(grep -v "^#" .env | xargs) || true); (pkill -f "gateway.jar" || true); sleep 2; nohup java -jar gateway.jar --spring.profiles.active=prod >> app.log 2>&1 &'

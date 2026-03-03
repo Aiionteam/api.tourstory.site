@@ -123,6 +123,30 @@ cd api.aiion.site
 2. **개방-폐쇄 원칙**: 새로운 서비스 추가 시 Gateway 코드 수정 최소화
 3. **의존성 역전 원칙**: Gateway는 서비스 구현 세부사항에 의존하지 않음
 
+## CI/CD (GitHub Actions)
+
+`feature/yujin` 브랜치에 push 시 자동으로 빌드 후 EC2에 배포됩니다.
+
+### 필수 설정 (GitHub → Settings → Secrets and variables → Actions)
+
+| Secret      | 설명                    |
+|------------|-------------------------|
+| `EC2_HOST` | EC2 퍼블릭 IP 또는 도메인 |
+| `EC2_USER` | SSH 사용자 (Ubuntu: `ubuntu`) |
+| `EC2_SSH_KEY` | PEM 키 파일 내용 전체   |
+
+### 선택: .env를 EC2로 복사
+
+- **Variables**에 `USE_ENV_FILE` = `true` 추가
+- **Secrets**에 `ENV_FILE` = .env 파일 내용 전체 추가
+
+### EC2 사전 준비
+
+- Java 21, Redis 설치
+- 보안 그룹에서 22(SSH), 8080 포트 허용
+
+---
+
 ## 확장성
 
 - 새로운 마이크로서비스 추가 시 `application.yaml`에 라우팅 규칙만 추가
