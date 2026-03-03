@@ -77,32 +77,36 @@ jobs:
           fi
           scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/.env
 
+      - name: Create run.sh ( .env 로드 후 exec java로 환경 변수 전달)
+        run: |
+          cat > run.sh << 'RUN'
+          #!/bin/bash
+          cd ~/app
+          if [ -f .env ]; then set -a; . ./.env || true; set +a; fi
+          [ -n "$NEON_CONNECTION_STRING" ] && export SPRING_DATASOURCE_URL="$NEON_CONNECTION_STRING"
+          [ -n "$NEON_USER" ] && export SPRING_DATASOURCE_USERNAME="$NEON_USER"
+          [ -n "$NEON_PASSWORD" ] && export SPRING_DATASOURCE_PASSWORD="$NEON_PASSWORD"
+          exec /usr/bin/java -jar gateway.jar --spring.profiles.active=prod
+          RUN
+
       - name: Create restart script
         run: |
           cat > restart.sh << 'SCRIPT'
           #!/bin/bash
           set -e
           cd ~/app
-          if [ -f .env ]; then set -a; . ./.env || true; set +a; fi
-          [ -n "$NEON_CONNECTION_STRING" ] && export SPRING_DATASOURCE_URL="$NEON_CONNECTION_STRING"
-          [ -n "$NEON_USER" ] && export SPRING_DATASOURCE_USERNAME="$NEON_USER"
-          [ -n "$NEON_PASSWORD" ] && export SPRING_DATASOURCE_PASSWORD="$NEON_PASSWORD"
           pkill -f gateway.jar || true
           sleep 2
           touch app.log
-          nohup /usr/bin/java \
-            ${SPRING_DATASOURCE_URL:+-Dspring.datasource.url="$SPRING_DATASOURCE_URL"} \
-            ${SPRING_DATASOURCE_USERNAME:+-Dspring.datasource.username="$SPRING_DATASOURCE_USERNAME"} \
-            ${SPRING_DATASOURCE_PASSWORD:+-Dspring.datasource.password="$SPRING_DATASOURCE_PASSWORD"} \
-            -jar gateway.jar --spring.profiles.active=prod >> app.log 2>&1 &
+          nohup bash ./run.sh >> app.log 2>&1 &
           sleep 15
           pgrep -f gateway.jar || exit 1
           SCRIPT
 
       - name: Copy and run restart script on EC2
         run: |
-          scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no restart.sh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/restart.sh
-          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'chmod +x ~/app/restart.sh && bash ~/app/restart.sh'
+          scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no run.sh restart.sh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'chmod +x ~/app/run.sh ~/app/restart.sh && bash ~/app/restart.sh'
 
       - name: Show app.log on failure (디버깅용)
         if: failure()
