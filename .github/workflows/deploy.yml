@@ -69,11 +69,13 @@ jobs:
 
       - name: Copy .env to EC2
         if: vars.USE_ENV_FILE == 'true'
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
           if [ "${{ vars.USE_BASE64_ENV }}" = "true" ]; then
-            echo "${{ secrets.ENV_FILE }}" | base64 -d | sed 's/\r$//' > .env
+            echo "$ENV_FILE_CONTENT" | base64 -d | sed 's/\r$//' > .env
           else
-            echo "${{ secrets.ENV_FILE }}" | sed 's/\r$//' > .env
+            printf '%s\n' "$ENV_FILE_CONTENT" | sed 's/\r$//' > .env
           fi
           scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/.env
 
@@ -113,3 +115,14 @@ jobs:
         run: |
           echo "=== EC2 ~/app/app.log (last 80 lines) ==="
           ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'tail -80 ~/app/app.log 2>/dev/null || echo "(app.log 없음)"'
+
+      - name: Check .env on EC2 (실패 시)
+        if: failure()
+        run: |
+          echo "=== EC2 .env 상태 (값 제외) ==="
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+            echo "--- .env 존재/줄수 ---"
+            if [ -f ~/app/.env ]; then wc -l ~/app/.env; head -1 ~/app/.env | cut -d= -f1; else echo ".env 없음"; fi
+            echo "--- .env 로드 후 NEON_CONNECTION_STRING 설정 여부 ---"
+            (cd ~/app && set -a && . ./.env 2>/dev/null; set +a; [ -n "$NEON_CONNECTION_STRING" ] && echo "설정됨" || echo "비어있음")
+          '
