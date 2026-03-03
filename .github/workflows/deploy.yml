@@ -81,3 +81,9 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
             'set -e; cd ~/app; if [ -f .env ]; then set -a; . ./.env; set +a; fi; (pkill -f gateway.jar || true); sleep 2; nohup /usr/bin/java -jar gateway.jar --spring.profiles.active=prod >> app.log 2>&1 & sleep 15; pgrep -f gateway.jar || exit 1'
+
+      - name: Show app.log on failure (디버깅용)
+        if: failure()
+        run: |
+          echo "=== EC2 ~/app/app.log (last 80 lines) ==="
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'tail -80 ~/app/app.log 2>/dev/null || echo "(app.log 없음)"'
