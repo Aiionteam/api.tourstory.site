@@ -8,7 +8,7 @@
 # 선택: .env를 EC2로 복사하려면
 #   Variables에 USE_ENV_FILE = true 추가
 #   Secrets에 ENV_FILE = .env 파일 내용 전체 (그대로 붙여넣기)
-#     또는 값에 따옴표 등 특수문자가 많으면 Base64 인코딩 후 넣고 USE_BASE64_ENV = true
+#     복사 후 줄바꿈(CRLF→LF) 자동 변환. 그래도 변수 인식 안 되면 USE_BASE64_ENV = true 하고 ENV_FILE에 base64(.env) 넣기.
 #
 name: Build and Deploy to EC2
 
@@ -71,9 +71,9 @@ jobs:
         if: vars.USE_ENV_FILE == 'true'
         run: |
           if [ "${{ vars.USE_BASE64_ENV }}" = "true" ]; then
-            echo "${{ secrets.ENV_FILE }}" | base64 -d > .env
+            echo "${{ secrets.ENV_FILE }}" | base64 -d | sed 's/\r$//' > .env
           else
-            echo "${{ secrets.ENV_FILE }}" > .env
+            echo "${{ secrets.ENV_FILE }}" | sed 's/\r$//' > .env
           fi
           scp -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no .env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/.env
 
