@@ -20,4 +20,6 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # healthcheck: Alpine 이미지에 curl/wget이 없을 수 있어 비활성화. 필요 시 Dockerfile에 추가 후 사용

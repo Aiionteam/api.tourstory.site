@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "honor_votes", uniqueConstraints = {
@@ -17,6 +18,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class HonorVote {
+
+    /** 일일 기준 시간대: 태평양 자정(00:00)에 날짜가 바뀜 */
+    public static final ZoneId VOTE_DATE_ZONE = ZoneId.of("America/Los_Angeles");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -39,7 +44,7 @@ public class HonorVote {
 
     @PrePersist
     protected void onCreate() {
-        if (voteDate == null) voteDate = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        if (createdAt == null) createdAt = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        if (voteDate == null) voteDate = LocalDate.now(VOTE_DATE_ZONE);
+        if (createdAt == null) createdAt = LocalDateTime.now(VOTE_DATE_ZONE);
     }
 }

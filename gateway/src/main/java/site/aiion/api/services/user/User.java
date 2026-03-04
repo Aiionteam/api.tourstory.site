@@ -38,7 +38,7 @@ public class User {
     private String refreshToken;
 
     /** 명예도 (0~). 등급: 실버(0~99), 골드(100~499), 플래티넘(500~999), 다이아(1000+) */
-    @Column(name = "honor", nullable = false)
+    @Column(name = "honor", nullable = false, columnDefinition = "integer not null default 0")
     private Integer honor = 0;
 
     // Commented out because Diary type is not resolved.
