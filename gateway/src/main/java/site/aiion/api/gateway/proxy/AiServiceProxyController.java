@@ -36,6 +36,12 @@ public class AiServiceProxyController {
 	@Value("${ai.service.vision.url:}")
 	private String visionServiceUrl;
 
+	@Value("${ai.service.festival.url:http://localhost:8002}")
+	private String festivalServiceUrl;
+
+	@Value("${ai.service.tourplaner.url:http://localhost:8003}")
+	private String tourplanerServiceUrl;
+
 	public AiServiceProxyController(RestTemplate restTemplate)
 	{
 		this.restTemplate = restTemplate;
@@ -81,6 +87,28 @@ public class AiServiceProxyController {
 		// ragServiceUrl은 base URL만 포함 (예: http://chat.hohyun.site:8001)
 		// /api/rag/llama/** → /rag/llama/**로 변환되어 ragServiceUrl과 결합
 		return proxyRequest(ragServiceUrl, body, method, request, headers);
+	}
+
+	// Festival 서비스 프록시 (8002) - /api/v1/festivals, /api/v1/festivals/** → festival service
+	@RequestMapping({"/v1/festivals", "/v1/festivals/**"})
+	public ResponseEntity<String> proxyFestivalService(
+			@RequestBody(required = false) String body,
+			HttpMethod method,
+			HttpServletRequest request,
+			@RequestHeader HttpHeaders headers)
+	{
+		return proxyRequest(festivalServiceUrl + "/api", body, method, request, headers);
+	}
+
+	// Tourplaner 서비스 프록시 (8003) - /api/v1/weather, /api/v1/weather/** → tourplaner service
+	@RequestMapping({"/v1/weather", "/v1/weather/**"})
+	public ResponseEntity<String> proxyTourplanerService(
+			@RequestBody(required = false) String body,
+			HttpMethod method,
+			HttpServletRequest request,
+			@RequestHeader HttpHeaders headers)
+	{
+		return proxyRequest(tourplanerServiceUrl + "/api", body, method, request, headers);
 	}
 
 	// LangGraph 채팅 서비스 프록시 (8001 → 게이트웨이 경유로 통일)
