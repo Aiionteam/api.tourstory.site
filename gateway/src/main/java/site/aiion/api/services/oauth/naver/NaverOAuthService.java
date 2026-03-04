@@ -43,11 +43,6 @@ public class NaverOAuthService {
      */
     public Map<String, Object> getAccessToken(String code) {
         System.out.println("=== 네이버 Access Token 요청 ===");
-        System.out.println("Authorization Code: " + code);
-        System.out.println("Client ID: " + (clientId != null ? clientId.substring(0, Math.min(clientId.length(), 10)) + "..." : "null"));
-        System.out.println("Redirect URI: " + redirectUri);
-        System.out.println("Redirect URI 길이: " + (redirectUri != null ? redirectUri.length() : 0));
-        
         // 요청 파라미터 설정
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
@@ -72,9 +67,6 @@ public class NaverOAuthService {
             );
             
             System.out.println("네이버 토큰 응답 상태: " + response.getStatusCode());
-            System.out.println("네이버 토큰 응답: " + response.getBody());
-            System.out.println("================================");
-            
             @SuppressWarnings("unchecked")
             Map<String, Object> body = response.getBody();
             
@@ -109,8 +101,6 @@ public class NaverOAuthService {
      */
     public Map<String, Object> getUserInfo(String accessToken) {
         System.out.println("=== 네이버 사용자 정보 요청 ===");
-        System.out.println("Access Token: " + accessToken.substring(0, Math.min(accessToken.length(), 20)) + "...");
-        
         // 헤더 설정
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);

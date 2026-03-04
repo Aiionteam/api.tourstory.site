@@ -102,7 +102,18 @@ public class AiServiceProxyController {
 
 	// Tourplaner 서비스 프록시 (8003) - /api/v1/weather, /api/v1/weather/** → tourplaner service
 	@RequestMapping({"/v1/weather", "/v1/weather/**"})
-	public ResponseEntity<String> proxyTourplanerService(
+	public ResponseEntity<String> proxyTourplanerWeather(
+			@RequestBody(required = false) String body,
+			HttpMethod method,
+			HttpServletRequest request,
+			@RequestHeader HttpHeaders headers)
+	{
+		return proxyRequest(tourplanerServiceUrl + "/api", body, method, request, headers);
+	}
+
+	// Planner 서비스 프록시 (8003) - /api/v1/planner/** → tourplaner service
+	@RequestMapping({"/v1/planner", "/v1/planner/**"})
+	public ResponseEntity<String> proxyTourplanerPlanner(
 			@RequestBody(required = false) String body,
 			HttpMethod method,
 			HttpServletRequest request,

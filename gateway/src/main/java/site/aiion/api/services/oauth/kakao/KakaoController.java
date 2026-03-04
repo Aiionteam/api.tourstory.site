@@ -6,7 +6,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 import site.aiion.api.services.oauth.token.TokenService;
-import site.aiion.api.services.oauth.util.JwtUtil;
 import site.aiion.api.services.oauth.util.JwtTokenProvider;
 
 import java.net.URLEncoder;
@@ -293,22 +292,11 @@ public class KakaoController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletRequest httpRequest) {
         System.out.println("=== 카카오 로그인 요청 수신 ===");
-        System.out.println("Request Body: " + request);
-        
-        // Authorization 헤더에서 토큰 확인
-        if (authHeader != null) {
-            System.out.println("Authorization 헤더: " + authHeader);
-            if (authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                System.out.println("추출된 토큰: " + token.substring(0, Math.min(token.length(), 50)) + "...");
-                // JWT 토큰 파싱 및 정보 출력
-                System.out.println(JwtUtil.formatTokenInfo(authHeader));
-            }
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            System.out.println("Authorization 헤더 있음 (토큰 로그 생략)");
         } else {
             System.out.println("Authorization 헤더 없음");
         }
-        
-        System.out.println("============================");
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -325,8 +313,6 @@ public class KakaoController {
     @PostMapping("/token")
     public ResponseEntity<Map<String, Object>> kakaoToken(@RequestBody(required = false) Map<String, Object> request) {
         System.out.println("=== 카카오 토큰 요청 수신 ===");
-        System.out.println("Request Body: " + request);
-        
         Map<String, Object> response = new HashMap<>();
         
         try {
@@ -371,51 +357,13 @@ public class KakaoController {
             String jwtAccessToken = jwtTokenProvider.generateAccessToken(userId, "kakao", userInfo);
             String jwtRefreshToken = jwtTokenProvider.generateRefreshToken(userId, "kakao");
             
-            // JWT 토큰 상세 정보 출력
-            System.out.println("\n=== 생성된 JWT 토큰 정보 ===");
-            System.out.println("Access Token (전체): " + jwtAccessToken);
-            System.out.println("Refresh Token (전체): " + jwtRefreshToken);
-            System.out.println("\n--- Access Token 파싱 ---");
-            System.out.println(JwtUtil.formatTokenInfo("Bearer " + jwtAccessToken));
-            System.out.println("\n--- Refresh Token 파싱 ---");
-            System.out.println(JwtUtil.formatTokenInfo("Bearer " + jwtRefreshToken));
-            
             // JWT 토큰 검증
             boolean isValidAccessToken = jwtTokenProvider.validateToken(jwtAccessToken);
-            boolean isValidRefreshToken = jwtTokenProvider.validateToken(jwtRefreshToken);
-            System.out.println("\n--- JWT 토큰 검증 결과 ---");
-            System.out.println("Access Token 유효성: " + (isValidAccessToken ? "✅ 유효" : "❌ 무효"));
-            System.out.println("Refresh Token 유효성: " + (isValidRefreshToken ? "✅ 유효" : "❌ 무효"));
-            
-            // JWT 토큰에서 사용자 정보 추출
-            if (isValidAccessToken) {
-                var claims = jwtTokenProvider.getAllClaimsFromToken(jwtAccessToken);
-                System.out.println("\n--- JWT Access Token 클레임 정보 ---");
-                System.out.println("Subject (User ID): " + claims.getSubject());
-                System.out.println("Provider: " + claims.get("provider"));
-                System.out.println("Type: " + claims.get("type"));
-                System.out.println("Nickname: " + claims.get("nickname"));
-                System.out.println("Email: " + claims.get("email"));
-                System.out.println("Issued At: " + claims.getIssuedAt());
-                System.out.println("Expiration: " + claims.getExpiration());
-            }
-            System.out.println("============================\n");
+            jwtTokenProvider.validateToken(jwtRefreshToken);
             
             // 6. Redis에 토큰 저장 (Access Token: 1시간, Refresh Token: 30일)
-            System.out.println("Redis에 토큰 저장 중...");
             tokenService.saveAccessToken("kakao", userId, jwtAccessToken, 3600);
             tokenService.saveRefreshToken("kakao", userId, jwtRefreshToken, 2592000);
-            
-            // Redis 저장 확인
-            String savedAccessToken = tokenService.getAccessToken("kakao", userId);
-            String savedRefreshToken = tokenService.getRefreshToken("kakao", userId);
-            if (savedAccessToken != null && savedRefreshToken != null) {
-                System.out.println("✅ Redis에 토큰 저장 성공!");
-                System.out.println("  - Access Token Key: token:kakao:" + userId + ":access");
-                System.out.println("  - Refresh Token Key: token:kakao:" + userId + ":refresh");
-            } else {
-                System.out.println("⚠️ Redis 토큰 저장 확인 실패");
-            }
             
             System.out.println("카카오 인증 완료: " + userInfo.get("nickname"));
             System.out.println("============================");
@@ -451,24 +399,17 @@ public class KakaoController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletRequest request) {
         System.out.println("=== 카카오 사용자 정보 조회 요청 수신 ===");
-        
         Map<String, Object> response = new HashMap<>();
         
         try {
-            // Authorization 헤더 검증
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                System.out.println("Authorization 헤더 없음 또는 형식 오류");
                 response.put("success", false);
                 response.put("message", "인증 토큰이 필요합니다.");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
             }
             
             String token = authHeader.substring(7);
-            System.out.println("JWT 토큰 검증 중...");
-            
-            // JWT 토큰 검증
             if (!jwtTokenProvider.validateToken(token)) {
-                System.out.println("JWT 토큰 검증 실패");
                 response.put("success", false);
                 response.put("message", "유효하지 않은 토큰입니다.");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
@@ -477,8 +418,6 @@ public class KakaoController {
             // JWT 토큰에서 사용자 정보 추출
             String userId = jwtTokenProvider.getUserIdFromToken(token);
             var claims = jwtTokenProvider.getAllClaimsFromToken(token);
-            
-            System.out.println("사용자 인증 성공: " + userId);
             
             // Redis에서 토큰 확인 (선택적)
             String storedToken = tokenService.getAccessToken("kakao", userId);
