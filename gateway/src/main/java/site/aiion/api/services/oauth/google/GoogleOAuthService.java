@@ -43,8 +43,6 @@ public class GoogleOAuthService {
      */
     public Map<String, Object> getAccessToken(String code) {
         System.out.println("=== 구글 Access Token 요청 ===");
-        System.out.println("Authorization Code: " + code);
-        
         // 요청 파라미터 설정
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
@@ -68,9 +66,6 @@ public class GoogleOAuthService {
                 Map.class
             );
             
-            System.out.println("구글 토큰 응답: " + response.getBody());
-            System.out.println("================================");
-            
             @SuppressWarnings("unchecked")
             Map<String, Object> body = response.getBody();
             return body;
@@ -88,8 +83,6 @@ public class GoogleOAuthService {
      */
     public Map<String, Object> getUserInfo(String accessToken) {
         System.out.println("=== 구글 사용자 정보 요청 ===");
-        System.out.println("Access Token: " + accessToken.substring(0, Math.min(accessToken.length(), 20)) + "...");
-        
         // 헤더 설정
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + accessToken);

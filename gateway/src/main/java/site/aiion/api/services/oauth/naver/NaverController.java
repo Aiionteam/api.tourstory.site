@@ -6,7 +6,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 import site.aiion.api.services.oauth.token.TokenService;
-import site.aiion.api.services.oauth.util.JwtUtil;
 import site.aiion.api.services.oauth.util.JwtTokenProvider;
 
 import java.net.URLEncoder;
@@ -306,22 +305,11 @@ public class NaverController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletRequest httpRequest) {
         System.out.println("=== 네이버 로그인 요청 수신 ===");
-        System.out.println("Request Body: " + request);
-        
-        // Authorization 헤더에서 토큰 확인
-        if (authHeader != null) {
-            System.out.println("Authorization 헤더: " + authHeader);
-            if (authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                System.out.println("추출된 토큰: " + token.substring(0, Math.min(token.length(), 50)) + "...");
-                // JWT 토큰 파싱 및 정보 출력
-                System.out.println(JwtUtil.formatTokenInfo(authHeader));
-            }
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            System.out.println("Authorization 헤더 있음 (토큰 로그 생략)");
         } else {
             System.out.println("Authorization 헤더 없음");
         }
-        
-        System.out.println("============================");
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -338,8 +326,6 @@ public class NaverController {
     @PostMapping("/token")
     public ResponseEntity<Map<String, Object>> naverToken(@RequestBody(required = false) Map<String, Object> request) {
         System.out.println("=== 네이버 토큰 요청 수신 ===");
-        System.out.println("Request Body: " + request);
-        System.out.println("============================");
         
         Map<String, Object> response = new HashMap<>();
         
@@ -396,22 +382,11 @@ public class NaverController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletRequest request) {
         System.out.println("=== 네이버 사용자 정보 조회 요청 수신 ===");
-        
-        // Authorization 헤더에서 토큰 출력 및 JWT 파싱
-        if (authHeader != null) {
-            System.out.println("Authorization 헤더: " + authHeader);
-            if (authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                System.out.println("추출된 토큰: " + token.substring(0, Math.min(token.length(), 50)) + "...");
-                
-                // JWT 토큰 파싱 및 정보 출력
-                System.out.println(JwtUtil.formatTokenInfo(authHeader));
-            }
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            System.out.println("Authorization 헤더 있음 (토큰 로그 생략)");
         } else {
             System.out.println("Authorization 헤더 없음");
         }
-        
-        System.out.println("============================");
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
