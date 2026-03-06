@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Enumeration;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api")
@@ -41,6 +42,9 @@ public class AiServiceProxyController {
 
 	@Value("${ai.service.tourplaner.url:http://localhost:8003}")
 	private String tourplanerServiceUrl;
+
+	@Value("${ai.service.user-info.url:http://localhost:8004}")
+	private String userInfoServiceUrl;
 
 	public AiServiceProxyController(RestTemplate restTemplate)
 	{
@@ -122,6 +126,17 @@ public class AiServiceProxyController {
 		return proxyRequest(tourplanerServiceUrl + "/api", body, method, request, headers);
 	}
 
+	// User Profile 서비스 프록시 (8004) - /api/v1/user-profile/** → user_info service
+	@RequestMapping({"/v1/user-profile", "/v1/user-profile/**"})
+	public ResponseEntity<String> proxyUserInfoService(
+			@RequestBody(required = false) String body,
+			HttpMethod method,
+			HttpServletRequest request,
+			@RequestHeader HttpHeaders headers)
+	{
+		return proxyRequest(userInfoServiceUrl + "/api", body, method, request, headers);
+	}
+
 	// LangGraph 채팅 서비스 프록시 (8001 → 게이트웨이 경유로 통일)
 	// /api/v1/admin/** → ragServiceUrl(8001)/api/v1/admin/**
 	@RequestMapping({"/v1/admin/**"})
@@ -150,6 +165,18 @@ public class AiServiceProxyController {
 		}
 		return proxyRequest(visionServiceUrl + "/diffusers", body, method, request, headers);
 	}
+
+	// 업스트림 FastAPI 서비스가 자체적으로 붙이는 CORS 헤더.
+	// 게이트웨이(Spring Security)가 CORS를 전담하므로, 업스트림 CORS 헤더는 제거해야 한다.
+	// 두 값이 공존하면 브라우저가 "multiple values" 오류로 요청을 차단한다.
+	private static final Set<String> UPSTREAM_CORS_HEADERS = Set.of(
+			"access-control-allow-origin",
+			"access-control-allow-methods",
+			"access-control-allow-headers",
+			"access-control-allow-credentials",
+			"access-control-expose-headers",
+			"access-control-max-age"
+	);
 
 	private ResponseEntity<String> proxyRequest(
 			String baseUrl,
@@ -194,14 +221,16 @@ public class AiServiceProxyController {
 		try
 		{
 			ResponseEntity<String> responseEntity = restTemplate.exchange(uri, method, httpEntity, String.class);
+			HttpHeaders filteredHeaders = filterUpstreamCorsHeaders(responseEntity.getHeaders());
 			return ResponseEntity.status(responseEntity.getStatusCode())
-					.headers(responseEntity.getHeaders())
+					.headers(filteredHeaders)
 					.body(responseEntity.getBody());
 		}
 		catch (HttpClientErrorException | HttpServerErrorException e)
 		{
+			HttpHeaders filteredHeaders = filterUpstreamCorsHeaders(e.getResponseHeaders());
 			return ResponseEntity.status(e.getStatusCode())
-					.headers(e.getResponseHeaders())
+					.headers(filteredHeaders)
 					.body(e.getResponseBodyAsString());
 		}
 		catch (Exception e)
@@ -209,6 +238,20 @@ public class AiServiceProxyController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Proxy error: " + e.getMessage());
 		}
+	}
+
+	/** 업스트림 서비스의 CORS 헤더를 제거한 새 HttpHeaders 반환 */
+	private HttpHeaders filterUpstreamCorsHeaders(HttpHeaders source)
+	{
+		if (source == null) return new HttpHeaders();
+		HttpHeaders filtered = new HttpHeaders();
+		source.forEach((name, values) -> {
+			if (!UPSTREAM_CORS_HEADERS.contains(name.toLowerCase()))
+			{
+				filtered.addAll(name, values);
+			}
+		});
+		return filtered;
 	}
 }
 
