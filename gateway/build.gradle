@@ -54,6 +54,10 @@ dependencies {
 	
 	// Swagger
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.0.2'
+
+	// Apache HttpComponents – RestTemplate PATCH 지원 (SimpleClientHttpRequestFactory는 PATCH 미지원)
+	// Spring Boot 3.4.x BOM 기준 버전: 5.4.1 (TlsSocketStrategy 클래스 포함)
+	implementation 'org.apache.httpcomponents.client5:httpclient5:5.4.1'
 	
 	// Services는 gateway/src/main/java 안에 직접 포함되어 있으므로 별도 모듈 의존성 불필요
 	

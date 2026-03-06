@@ -81,6 +81,12 @@ ai:
       url: ${AI_SERVICE_RAG_URL:http://chat.hohyun.site:8001}
     vision:
       url: ${AI_SERVICE_VISION_URL:}  # 비어있으면 vision 서비스 미사용
+    festival:
+      url: ${AI_SERVICE_FESTIVAL_URL:http://host.docker.internal:8002}
+    tourplaner:
+      url: ${AI_SERVICE_TOURPLANER_URL:http://host.docker.internal:8003}
+    user-info:
+      url: ${AI_SERVICE_USER_INFO_URL:http://host.docker.internal:8004}
 
 logging:
   level:
